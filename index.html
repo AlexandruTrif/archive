@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firefox Archive Finder</title>
+<style>
+  :root{
+    --ink:#1c2b2a;
+    --paper:#f4efe1;
+    --ledger:#12201c;
+    --ledger-2:#1a2f28;
+    --brass:#b5883a;
+    --brass-bright:#d8a23b;
+    --teal:#3e7c7c;
+    --red-stamp:#9a4a3a;
+    --line: rgba(244,239,225,0.14);
+    --mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --serif: 'Source Serif 4', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--ledger);
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(216,162,59,0.06), transparent 40%),
+      radial-gradient(circle at 85% 92%, rgba(62,124,124,0.08), transparent 45%);
+    color:var(--paper);
+    font-family:var(--serif);
+    min-height:100vh;
+    padding:48px 20px 80px;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+  }
+  header{
+    margin-bottom:34px;
+  }
+  .kicker{
+    font-family:var(--mono);
+    font-size:12.5px;
+    letter-spacing:0.02em;
+    color:var(--teal);
+    margin:0 0 10px;
+  }
+  h1{
+    font-size:34px;
+    font-weight:600;
+    margin:0 0 12px;
+    line-height:1.15;
+    color:var(--paper);
+  }
+  header p{
+    font-size:16px;
+    line-height:1.55;
+    color:rgba(244,239,225,0.72);
+    max-width:56ch;
+    margin:0;
+  }
+  .card{
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:3px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4), 0 18px 40px -20px rgba(0,0,0,0.6);
+    position:relative;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:34px;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 22px, rgba(28,43,42,0.16) 22px 23px);
+    border-right:1px dashed rgba(28,43,42,0.25);
+  }
+  .searchcard{
+    padding:26px 26px 26px 56px;
+    margin-bottom:22px;
+  }
+  .field-label{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--teal);
+    margin-bottom:8px;
+    display:block;
+  }
+  .query-row{
+    display:flex;
+    gap:10px;
+  }
+  #query{
+    flex:1;
+    font-family:var(--serif);
+    font-size:17px;
+    padding:12px 14px;
+    border:1.5px solid rgba(28,43,42,0.28);
+    border-radius:3px;
+    background:#fffdf7;
+    color:var(--ink);
+  }
+  #query:focus{ outline:none; border-color:var(--teal); }
+  button{
+    font-family:var(--mono);
+    font-size:13px;
+    cursor:pointer;
+    border:none;
+    border-radius:3px;
+  }
+  #go{
+    background:var(--red-stamp);
+    color:var(--paper);
+    padding:0 22px;
+    font-size:13.5px;
+    letter-spacing:0.02em;
+  }
+  #go:hover{ background:#84402f; }
+  #go:disabled{ background:#b98d80; cursor:default; }
+  .examples{
+    margin-top:12px;
+    font-family:var(--mono);
+    font-size:12px;
+    color:rgba(28,43,42,0.55);
+  }
+  .examples button{
+    background:none;
+    color:var(--teal);
+    padding:0;
+    font-family:var(--mono);
+    font-size:12px;
+    text-decoration:underline;
+    text-decoration-color:rgba(62,124,124,0.4);
+  }
+  .parsed{
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px dashed rgba(28,43,42,0.25);
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:#fffdf7;
+    border:1px solid rgba(28,43,42,0.25);
+    border-radius:3px;
+    padding:6px 4px 6px 10px;
+  }
+  .chip label{
+    font-family:var(--mono);
+    font-size:10px;
+    color:rgba(28,43,42,0.5);
+    text-transform:lowercase;
+  }
+  .chip select, .chip input{
+    font-family:var(--mono);
+    font-size:12.5px;
+    border:none;
+    background:transparent;
+    color:var(--ink);
+    padding:2px 4px;
+    max-width:120px;
+  }
+  .chip select:focus, .chip input:focus{ outline:none; background:rgba(216,162,59,0.15); }
+
+  .log{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:rgba(244,239,225,0.82);
+    background:var(--ledger-2);
+    border:1px solid rgba(244,239,225,0.1);
+    border-radius:3px;
+    padding:14px 18px 14px 18px;
+    margin:0 0 22px;
+    min-height:1.4em;
+    display:none;
+  }
+  .log.visible{ display:block; }
+  .log .title{
+    color:var(--teal);
+    font-size:11px;
+    margin-bottom:8px;
+    letter-spacing:0.02em;
+  }
+  .log .step{ margin:2px 0; }
+  .log .ok{ color:var(--teal); }
+  .log .warn{ color:var(--brass-bright); }
+
+  .resultcard{
+    padding:24px 26px 26px 56px;
+    margin-bottom:16px;
+  }
+  .resultcard h2{
+    font-size:15px;
+    font-family:var(--mono);
+    margin:0 0 14px;
+    color:var(--red-stamp);
+    letter-spacing:0.01em;
+  }
+  .result-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+    padding:12px 0;
+    border-bottom:1px solid rgba(28,43,42,0.14);
+  }
+  .result-row:last-child{ border-bottom:none; }
+  .result-meta{ min-width:0; }
+  .result-name{
+    font-family:var(--mono);
+    font-size:13.5px;
+    word-break:break-all;
+    color:var(--ink);
+  }
+  .result-tag{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--teal);
+    border:1px solid var(--teal);
+    border-radius:2px;
+    padding:1px 6px;
+    margin-right:8px;
+    vertical-align:middle;
+  }
+  .result-tag.guess{ color:var(--brass); border-color:var(--brass); }
+  .actions{ display:flex; gap:8px; flex-shrink:0; }
+  .actions a, .actions button{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:12px;
+    padding:7px 12px;
+    border-radius:3px;
+    text-decoration:none;
+    white-space:nowrap;
+  }
+  .btn-download{ background:var(--ink); color:var(--paper); }
+  .btn-download:hover{ background:#0c1615; }
+  .btn-copy{ background:transparent; border:1px solid rgba(28,43,42,0.3); color:var(--ink); }
+  .btn-copy:hover{ background:rgba(28,43,42,0.06); }
+
+  .footnote{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:rgba(28,43,42,0.5);
+    margin-top:14px;
+    line-height:1.6;
+  }
+  .footnote a{ color:var(--teal); }
+
+  details.help{
+    margin-top:30px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:rgba(244,239,225,0.55);
+  }
+  details.help summary{
+    cursor:pointer;
+    color:var(--teal);
+  }
+  details.help .inner{
+    margin-top:12px;
+    line-height:1.7;
+    padding:16px 18px;
+    border:1px dashed var(--line);
+    border-radius:3px;
+  }
+  details.help code{
+    background:rgba(244,239,225,0.08);
+    padding:1px 5px;
+    border-radius:2px;
+  }
+  details.help a{ color:var(--brass-bright); }
+
+  @media (max-width:520px){
+    h1{ font-size:27px; }
+    .searchcard, .resultcard{ padding:20px 16px 20px 40px; }
+    .card::before{ width:24px; }
+    .log{ padding:12px 14px; }
+    .query-row{ flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="kicker">// archive.mozilla.org lookup</p>
+    <h1>Firefox Archive Finder</h1>
+    <p>Describe a build in plain words — version, channel, language, platform — and this pulls the real file straight out of Mozilla's release archive.</p>
+  </header>
+
+  <div class="card searchcard">
+    <span class="field-label">describe the build</span>
+    <div class="query-row">
+      <input id="query" type="text" placeholder="153b4 de dmg / 153.0b5 es zip / 156 win arm exe/ 156b5 it tar" autocomplete="off">
+      <button id="go">find it</button>
+    </div>
+    <div class="examples">
+      try:
+      <button data-ex="Firefox 157 beta 3 de pkg">157 beta 3 de pkg</button> ·
+      <button data-ex="153 esr de pkg">153 esr de pkg</button> ·
+      <button data-ex="153.2 esr es zip">153.2 esr es zip</button> ·
+      <button data-ex="115.25esr dmg de">115.25esr dmg de</button> ·
+      <button data-ex="128.6esr exe en-gb">128.6esr exe en-gb</button> ·
+      <button data-ex="140.7.1esr deb">140.7.1esr deb </button>
+    </div>
+
+    <div class="parsed" id="parsed" hidden></div>
+  </div>
+
+  <div id="resultsHost"></div>
+
+  <div class="log" id="log"></div>
+
+  <details class="help">
+    <summary>how this works / limitations</summary>
+    <div class="inner">
+      This page runs entirely in your browser — there's no backend, so you can host it on any free
+      static host (GitHub Pages, Cloudflare Pages, Netlify, Vercel, surge.sh...) and it works as-is.
+      <br><br>
+      It turns your sentence into a path on <code>archive.mozilla.org</code>, always under
+      <code>/pub/firefox/candidates/&lt;version&gt;-candidates/build&lt;N&gt;/&lt;platform&gt;/&lt;locale&gt;/</code> —
+      that tree holds every build, including final releases before and after they go live, so it's used
+      for beta / rc / esr / release alike rather than the separate <code>releases/</code> mirror. Developer
+      Edition ("devedition" / "deved" / "aurora" / "dev") is the same beta build under its own root instead:
+      <code>/pub/devedition/candidates/&lt;version&gt;-candidates/...</code>.
+      <br><br>
+      To find the exact filename (it isn't always predictable) the app tries to read that folder's real
+      directory listing through a public CORS proxy, since Mozilla's archive doesn't send CORS headers itself.
+      If every proxy is unreachable from your network, it falls back to a best-guess filename built from
+      Mozilla's normal naming pattern, clearly marked <em>guess</em> — it's usually right, but worth
+      checking against the manual browse link if the download 404s.
+      <br><br>
+      Only tested against beta / rc / esr / release channels. Nightly and Developer Edition use a different
+      archive layout and aren't handled yet.
+    </div>
+  </details>
+
+</div>
+
+<script>
+(function(){
+  const PROXIES = [
+    url => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+    url => "https://corsproxy.io/?url=" + encodeURIComponent(url),
+    url => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
+    url => "https://thingproxy.freeboard.io/fetch/" + url,
+    url => "https://r.jina.ai/" + url
+  ];
+
+  const LOCALES = {
+    "english":"en-US","en":"en-US","us english":"en-US","british english":"en-GB","en gb":"en-GB",
+    "german":"de","deutsch":"de","de":"de",
+    "french":"fr","francais":"fr","fr":"fr",
+    "spanish":"es-ES","espanol":"es-ES","es":"es-ES","spanish mexico":"es-MX","es mx":"es-MX",
+    "spanish argentina":"es-AR",
+    "italian":"it","italiano":"it","it":"it",
+    "portuguese brazil":"pt-BR","pt br":"pt-BR","brazilian portuguese":"pt-BR",
+    "portuguese":"pt-PT","pt pt":"pt-PT","pt":"pt-PT",
+    "dutch":"nl","nl":"nl",
+    "polish":"pl","polski":"pl","pl":"pl",
+    "russian":"ru","russkiy":"ru","ru":"ru",
+    "ukrainian":"uk","uk":"uk",
+    "chinese simplified":"zh-CN","simplified chinese":"zh-CN","zh cn":"zh-CN",
+    "chinese traditional":"zh-TW","traditional chinese":"zh-TW","zh tw":"zh-TW",
+    "japanese":"ja","nihongo":"ja","ja":"ja",
+    "korean":"ko","ko":"ko",
+    "turkish":"tr","tr":"tr",
+    "swedish":"sv-SE","sv":"sv-SE",
+    "norwegian":"nb-NO","nb":"nb-NO",
+    "danish":"da","da":"da",
+    "finnish":"fi","fi":"fi",
+    "czech":"cs","cs":"cs",
+    "hungarian":"hu","hu":"hu",
+    "greek":"el","el":"el",
+    "romanian":"ro","ro":"ro",
+    "bulgarian":"bg","bg":"bg",
+    "croatian":"hr","hr":"hr",
+    "slovak":"sk","sk":"sk",
+    "slovenian":"sl","sl":"sl",
+    "arabic":"ar","ar":"ar",
+    "hebrew":"he","he":"he",
+    "hindi":"hi-IN","hi":"hi-IN",
+    "indonesian":"id","id":"id",
+    "vietnamese":"vi","vi":"vi",
+    "thai":"th","th":"th",
+    "lithuanian":"lt","lt":"lt",
+    "latvian":"lv","lv":"lv",
+    "estonian":"et","et":"et",
+    "catalan":"ca","ca":"ca",
+    "basque":"eu","eu":"eu",
+    "galician":"gl","gl":"gl",
+    "serbian":"sr","sr":"sr",
+    "albanian":"sq","sq":"sq",
+    "slovenian2":"sl"
+  };
+
+  const PLATFORMS = {
+    "mac":"mac","macos":"mac","osx":"mac","os x":"mac","mac os":"mac","apple":"mac",
+    "win64":"win64","windows64":"win64","windows 64":"win64","win 64":"win64",
+    "win32":"win32","windows32":"win32","windows 32":"win32","win 32":"win32",
+    "windows":"win64","win":"win64","pc":"win64",
+    "winarm":"win64-aarch64","win64 arm":"win64-aarch64","windows arm":"win64-aarch64","aarch64 win":"win64-aarch64",
+    "linux aarch64":"linux-aarch64","linux arm64":"linux-aarch64","aarch64 linux":"linux-aarch64","arm64 linux":"linux-aarch64",
+    "linux64":"linux-x86_64","linux x86_64":"linux-x86_64","linux amd64":"linux-x86_64",
+    "linux32":"linux-i686","linux i686":"linux-i686","linux32bit":"linux-i686",
+    "linux":"linux-x86_64","ubuntu":"linux-x86_64","debian":"linux-x86_64","fedora":"linux-x86_64"
+  };
+
+  const EXT_BY_PLATFORM = {
+    "mac":"pkg",
+    "win64":"exe","win32":"exe","win64-aarch64":"exe",
+    "linux-x86_64":"tar.xz","linux-i686":"tar.bz2","linux-aarch64":"tar.xz"
+  };
+
+  const EXT_HINTS = { "pkg":"mac","dmg":"mac","exe":"win64","msi":"win64","tar.bz2":"linux-x86_64","tar.xz":"linux-x86_64","tar.gz":"linux-x86_64","deb":"linux-x86_64","zip":"win64","tar":"linux-x86_64" };
+
+  function norm(s){ return s.toLowerCase().replace(/[_,]/g," ").replace(/\s+/g," ").trim(); }
+
+  function parseQuery(rawInput){
+    // "153.2.0esr" has no space before the suffix, so \besr\b wouldn't see a
+    // boundary there (digit and letter are both word chars) — insert one.
+    const raw = rawInput.replace(/(\d)(esr)\b/gi, "$1 $2");
+    let q = " " + norm(raw) + " ";
+    const found = { version:null, channel:null, build:null, respin:null, platform:null, locale:null, ext:null };
+
+    // devedition keyword — checked first since it shares beta's version
+    // numbering (the compact patterns below would otherwise claim the
+    // channel slot before this keyword ever gets a look).
+    if(/\b(devedition|deved|aurora)\b/.test(q) || /\bdev\b/.test(q)) found.channel = "devedition";
+
+    // compact glued forms with no separator at all, e.g. "1520b3" meaning
+    // "152" + ".0b3", or "1520esr" meaning "152" + ".0esr" — the generic,
+    // boundary-based checks below can't see a break between the version
+    // digits and the channel letters here, so catch these explicitly first.
+    // The beta-index ones still extract version+build even when devedition
+    // was already detected above, since devedition shares that numbering.
+    let m = rawInput.match(/\b(\d{2,3})0b(?:eta)?(\d+)\b/i);
+    if(m){
+      found.version = found.version || m[1];
+      found.build = found.build || m[2];
+      if(!found.channel) found.channel = "beta";
+    }
+    if(!found.channel){
+      m = rawInput.match(/\b(\d{2,3})0rc(\d+)\b/i);
+      if(m){ found.version = m[1]; found.channel = "rc"; found.build = m[2]; }
+    }
+    if(!found.channel){
+      m = rawInput.match(/\b(\d{2,3})0esr\b/i);
+      if(m){ found.version = m[1]; found.channel = "esr"; }
+    }
+    // same idea but for versions typed without the ".0" at all, e.g.
+    // "156b3" meaning "156" + ".0b3" (no "0" separator like "1560b3" has).
+    m = rawInput.match(/\b(\d{2,3})b(\d+)\b/i);
+    if(m){
+      found.version = found.version || m[1];
+      found.build = found.build || m[2];
+      if(!found.channel) found.channel = "beta";
+    }
+    if(!found.channel){
+      m = rawInput.match(/\b(\d{2,3})rc(\d+)\b/i);
+      if(m){ found.version = m[1]; found.channel = "rc"; found.build = m[2]; }
+    }
+    // Mozilla's own version notation glued directly to the marker with no
+    // space, e.g. "153.0b5" or "115.41rc2" — the version already carries
+    // its own dot(s), so neither the no-dot compact forms above nor the
+    // space-separated generic check below can see a boundary right before
+    // the 'b'/'rc' (a digit precedes it, and digit+letter share no \b).
+    m = rawInput.match(/\b(\d{2,3}(?:\.\d+)?)b(?:eta)?(\d+)\b/i);
+    if(m){
+      found.version = found.version || m[1];
+      found.build = found.build || m[2];
+      if(!found.channel) found.channel = "beta";
+    }
+    if(!found.channel){
+      m = rawInput.match(/\b(\d{2,3}(?:\.\d+)?)rc(\d+)\b/i);
+      if(m){ found.version = m[1]; found.channel = "rc"; found.build = m[2]; }
+    }
+
+    // channel (generic, space/dot separated forms — skipped if already found above)
+    if(!found.channel){
+      if(/\besr\b/.test(q)) found.channel = "esr";
+      else if(/\b(beta)\b/.test(q) || /\bb\d+\b/.test(q)) found.channel = "beta";
+      else if(/\brc\b/.test(q)) found.channel = "rc";
+      else if(/\b(release|stable|final)\b/.test(q)) found.channel = "release";
+    }
+
+    // explicit betaN / bN / rcN build number (generic — skipped if already found above)
+    if(!found.build){
+      m = q.match(/\bb(?:eta)?\s*(\d+)\b/);
+      if(m){ found.build = m[1]; if(!found.channel) found.channel = "beta"; }
+      m = q.match(/\brc\s*(\d+)\b/);
+      if(m){ found.build = m[1]; found.channel = "rc"; }
+    }
+    // devedition's build index can also be given as a bare number right
+    // after its keyword, e.g. "156 dev 3" (no "beta" word needed).
+    if(found.channel === "devedition" && !found.build){
+      m = q.match(/\b(?:devedition|deved|aurora|dev)\s+(\d+)\b/);
+      if(m) found.build = m[1];
+    }
+
+    // respin — the candidates/ "buildN" folder, which is a separate counter
+    // from the beta/rc index above (most betas only ever get build1, no
+    // matter whether it's beta 1 or beta 9). Only set from an explicit
+    // "build2" / "respin 2" / "spin 2" style token — never inferred from
+    // the beta/rc number itself.
+    m = q.match(/\b(?:build|respin|spin)\s*(\d+)\b/);
+    if(m) found.respin = m[1];
+
+    // extension
+    for(const ext of Object.keys(EXT_HINTS)){
+      const pattern = ext.replace(".", "\\.");
+      if(new RegExp("\\b"+pattern+"\\b").test(q)){ found.ext = ext; break; }
+    }
+
+    // Windows ARM64 — catch any ordering/spacing of an arm token plus a
+    // windows token (e.g. "win arm", "windows arm64", "arm64 pc"), since
+    // the exact-phrase entries in PLATFORMS below can't cover every
+    // combination and would otherwise let a bare "win" win first.
+    const ARM_TOKEN = /\b(arm64|aarch64|aarch|arch|arm)\b/;
+    if(ARM_TOKEN.test(q) && /\b(win|windows|pc)\b/.test(q)){
+      found.platform = "win64-aarch64";
+    }
+    // Same idea for Linux ARM64 (e.g. "linux arm", "arm64 ubuntu").
+    if(!found.platform && ARM_TOKEN.test(q) && /\b(linux|ubuntu|debian|fedora)\b/.test(q)){
+      found.platform = "linux-aarch64";
+    }
+
+    // platform
+    if(!found.platform){
+      for(const key of Object.keys(PLATFORMS).sort((a,b)=>b.length-a.length)){
+        if(new RegExp("\\b"+key+"\\b").test(q)){ found.platform = PLATFORMS[key]; break; }
+      }
+    }
+    if(!found.platform && found.ext && EXT_HINTS[found.ext]) found.platform = EXT_HINTS[found.ext];
+
+    // No extension mentioned at all, but the platform is linux — default
+    // to tar rather than leaving it open-ended (falls through to the
+    // full multi-format search otherwise). Anything explicit, like
+    // "deb", was already caught by the extension scan above and wins.
+    if(!found.ext && found.platform && found.platform.startsWith("linux")){
+      found.ext = "tar";
+    }
+
+    // "tar" alone isn't a real Mozilla filename extension — it's always
+    // compressed (.tar.xz or the older .tar.bz2) — so resolve it to
+    // whichever one is current for the detected platform.
+    if(found.ext === "tar"){
+      found.ext = (found.platform && found.platform.startsWith("linux"))
+        ? (EXT_BY_PLATFORM[found.platform] || "tar.xz")
+        : "tar.xz";
+    }
+
+    // Hyphenated locale codes (e.g. "en-GB", "pt-BR") are unambiguous —
+    // nothing else in this vocabulary pairs two 2-letter tokens with a
+    // hyphen — so they're checked first. Otherwise something like
+    // "en-gb" would get stolen by the bare "en" dictionary entry below,
+    // since a hyphen counts as a word boundary just like a space does.
+    m = raw.match(/\b([a-zA-Z]{2})-([a-zA-Z]{2})\b/);
+    if(m) found.locale = m[1].toLowerCase() + "-" + m[2].toUpperCase();
+
+    // locale — try longest phrase matches first
+    if(!found.locale){
+      const localeKeys = Object.keys(LOCALES).sort((a,b)=>b.length-a.length);
+      for(const key of localeKeys){
+        if(new RegExp("\\b"+key+"\\b").test(q)){ found.locale = LOCALES[key]; break; }
+      }
+    }
+    // space-separated locale code fallback (e.g. "en gb" typed with a
+    // space instead of a hyphen) — lower priority than the dictionary
+    // since a bare space pair is more easily confused with unrelated
+    // word combinations (kept last, not restructured).
+    if(!found.locale){
+      m = raw.match(/\b([a-zA-Z]{2})[- ]([a-zA-Z]{2})\b/);
+      if(m) found.locale = m[1].toLowerCase() + "-" + m[2].toUpperCase();
+    }
+
+    // version — first standalone number that isn't a build/beta count already consumed
+    let qStripped = q
+      .replace(/\bb(?:eta)?\s*\d+\b/g," ")
+      .replace(/\brc\s*\d+\b/g," ");
+    if(!found.version){
+      m = qStripped.match(/\b(\d{2,3}(?:\.\d+){0,2})\b/);
+      if(m) found.version = m[1];
+    }
+
+    return found;
+  }
+
+  function versionString(version, channel, build){
+    let v = version;
+    if(channel === "esr"){
+      // ESR's full form is major.point.patch+esr (e.g. 115.41.0esr). A bare
+      // major ("115") pads to the valid first-release form "115.0esr" (2
+      // parts) — and "115.0" typed explicitly must resolve to that exact
+      // same URL, so it's left alone rather than padded again to
+      // "115.0.0esr". A nonzero point release ("115.41", 1 dot) still
+      // needs the ".0" appended to reach the full 3-part form
+      // "115.41.0esr". Already-complete major.point.patch ("153.2.0") is
+      // left untouched.
+      const parts = v.split(".");
+      if(parts.length === 1) v = v + ".0";
+      else if(parts.length === 2 && parts[1] !== "0") v = v + ".0";
+      return v + "esr";
+    }
+    if(!/\./.test(v)) v = v + ".0";
+    if(channel === "beta" || channel === "devedition") return v + "b" + (build || "1");
+    // rc + release both ship as plain "x.y" under candidates/releases
+    return v;
+  }
+
+  // Installer formats Mozilla has actually shipped per platform, used to
+  // recognize/prioritize real files in a live directory listing. Mac had
+  // two eras (.dmg then .pkg); linux similarly moved from .tar.bz2 to
+  // .tar.xz and later added .deb — all three still turn up depending on
+  // the version, so all are considered valid matches. Windows ships an
+  // .exe installer, an .msi installer, and a portable .zip alongside it.
+  const VALID_EXT_PER_PLATFORM = {
+    "mac": ["pkg","dmg"],
+    "win64": ["exe","msi","zip"], "win32": ["exe","msi","zip"], "win64-aarch64": ["exe","msi","zip"],
+    "linux-x86_64": ["tar.xz","deb","tar.bz2"], "linux-aarch64": ["tar.xz","deb"], "linux-i686": ["tar.bz2"]
+  };
+
+  // Extensions worth guessing offline (no live listing available). Unlike
+  // an earlier assumption, .deb turns out to follow the same simple
+  // "firefox-<version>.ext" pattern as tar.xz (confirmed against real
+  // archive listings), so it's included here too. tar.bz2 is left out of
+  // the guess list — current versions don't actually ship it (only
+  // tar.xz + deb do) — but it stays in VALID_EXT_PER_PLATFORM above in
+  // case an older version's real listing still has one.
+  const GUESS_EXT_PER_PLATFORM = {
+    "mac": ["pkg","dmg"],
+    "win64": ["exe","msi","zip"], "win32": ["exe","msi","zip"], "win64-aarch64": ["exe","msi","zip"],
+    "linux-x86_64": ["tar.xz","deb"], "linux-aarch64": ["tar.xz","deb"], "linux-i686": ["tar.bz2"]
+  };
+
+  // Windows installers (.exe, .msi) use "Firefox Setup <version>.ext", but
+  // the portable .zip follows the lowercase "firefox-<version>.zip" pattern
+  // shared with linux/mac's non-installer archives instead.
+  function nameFor(platform, versionStr, ext){
+    if(platform === "mac") return "Firefox " + versionStr + "." + ext;
+    if(platform && platform.startsWith("win")){
+      if(ext === "zip") return "firefox-" + versionStr + "." + ext;
+      return "Firefox Setup " + versionStr + "." + ext;
+    }
+    return "firefox-" + versionStr + "." + ext;
+  }
+
+  // Returns an ordered list of {name, ext} guesses: the requested extension
+  // first (if it's one we can reliably guess for this platform), then any
+  // other guessable extensions for that platform as alternates.
+  function guessFilenames(platform, versionStr, ext){
+    const valid = GUESS_EXT_PER_PLATFORM[platform] || [EXT_BY_PLATFORM[platform] || "exe"];
+    const order = [];
+    if(ext && valid.includes(ext)) order.push(ext);
+    valid.forEach(v => { if(!order.includes(v)) order.push(v); });
+    return order.map(e => ({ name: nameFor(platform, versionStr, e), ext: e }));
+  }
+
+  async function fetchThroughProxies(url, log){
+    try{
+      log("trying archive.mozilla.org directly ...");
+      const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+      if(res.ok){
+        const text = await res.text();
+        if(text && text.length > 20) return text;
+      } else {
+        log("  -> HTTP " + res.status, "warn");
+      }
+    }catch(e){
+      log("  -> blocked (likely CORS) — falling back to a proxy", "warn");
+    }
+    for(const build of PROXIES){
+      const proxied = build(url);
+      try{
+        log("trying " + new URL(proxied).hostname + " ...");
+        const res = await fetch(proxied, { signal: AbortSignal.timeout(9000) });
+        if(!res.ok) { log("  -> HTTP " + res.status, "warn"); continue; }
+        const text = await res.text();
+        if(text && text.length > 20) return text;
+        log("  -> empty response", "warn");
+      }catch(e){
+        log("  -> unreachable (" + (e.message||"error") + ")", "warn");
+      }
+    }
+    return null;
+  }
+
+  function extractLinks(html){
+    try{
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      return Array.from(doc.querySelectorAll("a")).map(a => a.getAttribute("href")).filter(Boolean);
+    }catch(e){
+      // fallback: crude regex if it's not real HTML (e.g. a text-reader proxy)
+      const out = [];
+      const re = /href="([^"]+)"/g;
+      let mm;
+      while((mm = re.exec(html))) out.push(mm[1]);
+      if(out.length) return out;
+      const re2 = /(\S+\.(?:pkg|dmg|exe|msi|zip|tar\.bz2|tar\.xz|tar\.gz))/gi;
+      while((mm = re2.exec(html))) out.push(mm[1]);
+      return out;
+    }
+  }
+
+  function isInstaller(name){
+    return /\.(pkg|dmg|exe|msi|zip|deb|tar\.bz2|tar\.xz|tar\.gz)$/i.test(name) &&
+           !/\.(asc|checksums?|json|mar)$/i.test(name);
+  }
+
+  function el(tag, attrs, children){
+    const e = document.createElement(tag);
+    if(attrs) for(const k in attrs){
+      if(k === "text") e.textContent = attrs[k];
+      else if(k === "html") e.innerHTML = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (children||[]).forEach(c => e.appendChild(c));
+    return e;
+  }
+
+  const logHost = document.getElementById("log");
+  function logLine(msg, cls){
+    logHost.classList.add("visible");
+    const p = el("div", { class: "step" + (cls ? " " + cls : ""), text: msg });
+    logHost.appendChild(p);
+    logHost.scrollTop = logHost.scrollHeight;
+  }
+  function clearLog(){
+    logHost.innerHTML = "";
+    logHost.classList.remove("visible");
+    logHost.appendChild(el("div", { class:"title", text:"lookup log" }));
+  }
+
+  function renderParsedChips(found){
+    const host = document.getElementById("parsed");
+    host.hidden = false;
+    host.innerHTML = "";
+
+    function chip(labelText, node){
+      const c = el("div", { class:"chip" }, [el("label", {text:labelText}), node]);
+      host.appendChild(c);
+    }
+
+    const verInput = el("input", { value: found.version || "", placeholder:"157" });
+    chip("version", verInput);
+
+    const chanSel = el("select", {});
+    ["beta","rc","esr","release","devedition"].forEach(v => {
+      const o = el("option", { value:v, text:v });
+      if(found.channel === v) o.setAttribute("selected","selected");
+      chanSel.appendChild(o);
+    });
+    if(!found.channel){ chanSel.value = "release"; }
+    chip("channel", chanSel);
+
+    const productSel = el("select", {});
+    ["firefox","devedition"].forEach(v => {
+      const o = el("option", { value:v, text:v });
+      if((found.channel === "devedition") === (v === "devedition")) o.setAttribute("selected","selected");
+      productSel.appendChild(o);
+    });
+    chip("product", productSel);
+
+    const buildInput = el("input", { value: found.build || "", placeholder:"auto" });
+    chip("beta/rc #", buildInput);
+
+    const respinInput = el("input", { value: found.respin || "", placeholder:"auto" });
+    chip("respin (buildN)", respinInput);
+
+    const platSel = el("select", {});
+    ["mac","win64","win32","win64-aarch64","linux-x86_64","linux-aarch64","linux-i686"].forEach(v=>{
+      const o = el("option", { value:v, text:v });
+      if(found.platform === v) o.setAttribute("selected","selected");
+      platSel.appendChild(o);
+    });
+    if(!found.platform) platSel.value = "win64";
+    chip("platform", platSel);
+
+    const localeInput = el("input", { value: found.locale || "en-US", placeholder:"en-US" });
+    chip("locale", localeInput);
+
+    const extInput = el("input", { value: found.ext || "", placeholder:"auto" });
+    chip("ext", extInput);
+
+    return { verInput, chanSel, productSel, buildInput, respinInput, platSel, localeInput, extInput };
+  }
+
+  function resultCard(){
+    const host = document.getElementById("resultsHost");
+    host.innerHTML = "";
+    const card = el("div", { class:"card resultcard" });
+    host.appendChild(card);
+    return card;
+  }
+
+  async function copyToClipboard(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      try{ await navigator.clipboard.writeText(text); return true; }catch(e){ /* fall through */ }
+    }
+    // Fallback for contexts where the async Clipboard API is blocked
+    // (sandboxed iframes, non-HTTPS, older browsers): a hidden textarea +
+    // the legacy execCommand, which isn't gated the same way.
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("style", "position:fixed;top:0;left:-9999px;opacity:0;");
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function addResultRow(card, name, url, tagText, tagClass){
+    const row = el("div", { class:"result-row" });
+    const meta = el("div", { class:"result-meta" }, [
+      el("span", { class:"result-tag" + (tagClass?" "+tagClass:""), text: tagText }),
+      el("span", { class:"result-name", text: name })
+    ]);
+    const actions = el("div", { class:"actions" }, [
+      el("a", { href:url, class:"btn-download", text:"download", target:"_blank", rel:"noopener" }),
+      el("button", { class:"btn-copy", text:"copy link" })
+    ]);
+    const copyBtn = actions.querySelector("button");
+    copyBtn.addEventListener("click", async () => {
+      const ok = await copyToClipboard(url);
+      const old = "copy link";
+      copyBtn.textContent = ok ? "copied" : "couldn't copy — long-press the link";
+      setTimeout(() => { copyBtn.textContent = old; }, ok ? 1200 : 2400);
+    });
+    row.appendChild(meta);
+    row.appendChild(actions);
+    card.appendChild(row);
+  }
+
+  async function findLatestBuildNumber(candidatesBaseUrl, log){
+    const html = await fetchThroughProxies(candidatesBaseUrl, log);
+    if(!html) return null;
+    const links = extractLinks(html);
+    const nums = links
+      .map(h => h.match(/build(\d+)\/?$/i))
+      .filter(Boolean)
+      .map(m => parseInt(m[1], 10));
+    if(!nums.length) return null;
+    return Math.max(...nums);
+  }
+
+  async function findFilesInFolder(folderUrl, ext, log){
+    const html = await fetchThroughProxies(folderUrl, log);
+    if(!html) return null;
+    // Real listings percent-encode the href (e.g. "Firefox%20153.0b3.pkg");
+    // decode it now so it's a clean filename — otherwise the later
+    // encodeURIComponent() when building the download URL would encode the
+    // literal "%" too, producing a broken double-encoded link.
+    let links = extractLinks(html)
+      .map(h => { try{ return decodeURIComponent(h.split("/").pop()); }catch(e){ return h.split("/").pop(); } })
+      .filter(isInstaller);
+    links = [...new Set(links)];
+    if(!links.length) return null;
+    if(ext){
+      links.sort((a,b) => {
+        const aMatch = a.toLowerCase().endsWith("." + ext.toLowerCase());
+        const bMatch = b.toLowerCase().endsWith("." + ext.toLowerCase());
+        return aMatch === bMatch ? 0 : (aMatch ? -1 : 1);
+      });
+    }
+    return links;
+  }
+
+  let currentGen = 0;
+
+  function triggerDownload(url){
+    try{
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }catch(e){ /* the visible download button still works even if this fails */ }
+  }
+
+  async function resolveAndRender(chips, opts){
+    opts = opts || {};
+    const gen = ++currentGen;
+    clearLog();
+    const goBtn = document.getElementById("go");
+    goBtn.disabled = true; goBtn.textContent = "searching…";
+
+    const version = chips.verInput.value.trim();
+    const channel = chips.chanSel.value;
+    const product = chips.productSel.value;                    // firefox vs devedition archive root
+    const betaIndex = chips.buildInput.value.trim() || null;   // goes into the version string, e.g. the "3" in 153.0b3
+    const respinRaw = chips.respinInput.value.trim();          // the candidates/buildN folder — a separate counter
+    const platform = chips.platSel.value;
+    const locale = chips.localeInput.value.trim() || "en-US";
+    const ext = chips.extInput.value.trim();
+
+    if(!version){
+      logLine("couldn't find a version number — type one into the version field above.", "warn");
+      goBtn.disabled = false; goBtn.textContent = "find it";
+      return;
+    }
+
+    const card = resultCard();
+    let respin = respinRaw || null;
+
+    const versionStr = versionString(version, channel, betaIndex);
+    const candidatesRoot = `https://archive.mozilla.org/pub/${product}/candidates/${versionStr}-candidates/`;
+
+    // A specific extension means the query is unambiguous — name the exact
+    // file with no network round-trip at all (defaulting to build1, where
+    // nearly every build actually lives, unless the query named a respin
+    // explicitly e.g. "build2"/"build 2") and stop there. No further
+    // searching, no fetching a listing to hunt for other formats — just
+    // that one file.
+    if(ext){
+      const instantFolder = `${candidatesRoot}build${respin || "1"}/${platform}/${locale}/`;
+      const instantName = nameFor(platform, versionStr, ext);
+      const instantUrl = instantFolder + encodeURIComponent(instantName);
+      addResultRow(card, instantName, instantUrl, "direct", "guess");
+      logLine(`channel: ${channel} (${product}), extension specified — going straight to ${instantUrl}`, "ok");
+      // Only auto-start the download on a fresh search submission (typing
+      // "find it"/Enter/an example), never on a live chip edit — otherwise
+      // every keystroke-triggered refresh would kick off a new download.
+      if(opts.autoDownload){
+        triggerDownload(instantUrl);
+        logLine("starting that download automatically", "ok");
+      }
+      const foot = el("div", { class:"footnote", html:
+        `folder: <a href="${instantFolder}" target="_blank" rel="noopener">${instantFolder}</a> — open this to double check by eye if the download above 404s, or to see other formats in that build.`
+      });
+      card.appendChild(foot);
+      goBtn.disabled = false; goBtn.textContent = "find it";
+      return;
+    }
+
+    logLine(`channel: ${channel} (${product}) -> looking at ${candidatesRoot}`);
+    if(!respin){
+      logLine("no respin given — checking the candidates folder for the latest one…");
+      const latest = await findLatestBuildNumber(candidatesRoot, logLine);
+      if(gen !== currentGen) return; // a newer edit superseded this run
+      if(latest){
+        respin = String(latest);
+        logLine(`found build${latest}`, "ok");
+      } else {
+        respin = "1";
+        logLine("couldn't read the listing, assuming build1", "warn");
+      }
+    }
+    const folderUrl = `${candidatesRoot}build${respin}/${platform}/${locale}/`;
+    const browseUrl = folderUrl;
+
+    logLine(`reading file listing: ${folderUrl}`);
+    const realFiles = await findFilesInFolder(folderUrl, ext, logLine);
+    if(gen !== currentGen) return; // a newer edit superseded this run
+
+    // (No extension was given — this only runs for the broader search;
+    // the ext-specified path above already returned with a single direct
+    // link and never reaches here.)
+    if(realFiles && realFiles.length){
+      logLine(`matched ${realFiles.length} real file${realFiles.length>1?"s":""} in the archive`, "ok");
+      realFiles.forEach(f => {
+        addResultRow(card, f, folderUrl + encodeURIComponent(f), "confirmed");
+      });
+    } else {
+      logLine("couldn't read the listing through any proxy — falling back to best-guess filenames", "warn");
+      const guesses = guessFilenames(platform, versionStr, ext);
+      guesses.forEach(g => {
+        addResultRow(card, g.name, folderUrl + encodeURIComponent(g.name), "guess", "guess");
+      });
+      if(guesses.length > 1){
+        logLine(`showing ${guesses.length} possible formats for ${platform} — try each if one 404s`, "warn");
+      }
+    }
+
+    const foot = el("div", { class:"footnote", html:
+      `folder: <a href="${browseUrl}" target="_blank" rel="noopener">${browseUrl}</a> — open this to double check by eye if the download above 404s.`
+    });
+    card.appendChild(foot);
+
+    goBtn.disabled = false; goBtn.textContent = "find it";
+  }
+
+  // Wires every chip so editing it live-refreshes the results: selects
+  // fire immediately (a discrete choice), text inputs are debounced so
+  // it doesn't re-fetch on every keystroke while typing.
+  let debounceTimer = null;
+  function wireLiveUpdates(chips){
+    const scheduleRefresh = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => resolveAndRender(chips), 500);
+    };
+    const immediateRefresh = () => { clearTimeout(debounceTimer); resolveAndRender(chips); };
+    [chips.verInput, chips.buildInput, chips.respinInput, chips.localeInput, chips.extInput]
+      .forEach(inp => inp.addEventListener("input", scheduleRefresh));
+    [chips.chanSel, chips.productSel, chips.platSel]
+      .forEach(sel => sel.addEventListener("change", immediateRefresh));
+  }
+
+  async function run(){
+    const raw = document.getElementById("query").value.trim();
+    if(!raw) return;
+    document.getElementById("resultsHost").innerHTML = "";
+
+    const found = parseQuery(raw);
+    const chips = renderParsedChips(found);
+    wireLiveUpdates(chips);
+
+    // give the DOM a tick after rendering before reading values back
+    await new Promise(r => setTimeout(r, 30));
+    resolveAndRender(chips, { autoDownload: true });
+  }
+
+  document.getElementById("go").addEventListener("click", run);
+  document.getElementById("query").addEventListener("keydown", e => { if(e.key === "Enter") run(); });
+  document.querySelectorAll(".examples button[data-ex]").forEach(b => {
+    b.addEventListener("click", () => {
+      document.getElementById("query").value = b.getAttribute("data-ex");
+      run();
+    });
+  });
+})();
+</script>
+</body>
+</html>
