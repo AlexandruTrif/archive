@@ -58,6 +58,67 @@
     max-width:56ch;
     margin:0;
   }
+  .howto{
+    position:relative;
+    display:inline-block;
+  }
+  .howto-trigger{
+    background:none;
+    border:none;
+    padding:0;
+    margin-left:2px;
+    font-family:var(--mono);
+    font-size:14px;
+    color:var(--brass-bright);
+    text-decoration:underline dotted;
+    text-decoration-color:rgba(216,162,59,0.45);
+    text-underline-offset:2px;
+    cursor:help;
+  }
+  .howto-trigger:hover, .howto-trigger:focus{ color:var(--teal); }
+  .howto-popover{
+    display:none;
+    position:absolute;
+    top:100%;
+    left:0;
+    margin-top:10px;
+    width:360px;
+    max-width:min(90vw, 400px);
+    background:var(--paper);
+    color:var(--ink);
+    border:1px solid rgba(28,43,42,0.22);
+    border-radius:4px;
+    box-shadow:0 20px 48px -14px rgba(0,0,0,0.6);
+    padding:18px 20px;
+    font-family:var(--mono);
+    font-size:12px;
+    line-height:1.65;
+    z-index:30;
+    text-align:left;
+  }
+  .howto:hover .howto-popover,
+  .howto-trigger:focus + .howto-popover{
+    display:block;
+  }
+  .howto-popover .group{ display:block; margin-bottom:14px; }
+  .howto-popover .group:last-child{ margin-bottom:0; }
+  .howto-popover .group-title{
+    display:block;
+    margin:0 0 5px;
+    font-family:var(--serif);
+    font-size:13px;
+    font-weight:600;
+    color:var(--red-stamp);
+  }
+  .howto-popover code{
+    background:rgba(28,43,42,0.07);
+    padding:1px 5px;
+    border-radius:2px;
+    font-size:11.5px;
+  }
+  @media (max-width:520px){
+    .howto-popover{ width:min(88vw, 340px); left:auto; right:0; }
+  }
   .card{
     background:var(--paper);
     color:var(--ink);
@@ -250,6 +311,11 @@
   }
   .footnote a{ color:var(--teal); }
 
+  .howto-line{
+    margin:0;
+    font-family:var(--mono);
+    font-size:12.5px;
+  }
   details.help{
     margin-top:30px;
     font-family:var(--mono);
@@ -316,6 +382,47 @@
 
   <div class="log" id="log"></div>
 
+  <p class="howto-line">
+    <span class="howto">
+      <button class="howto-trigger" type="button">what can I type here? ▸</button>
+      <span class="howto-popover">
+        <span class="group">
+          <strong class="group-title">version</strong>
+          <code>156</code> · <code>156.0</code> · <code>146.0.1</code> · <code>115.41</code> (esr point release)<br>
+          glued to a beta marker: <code>156b3</code> · <code>1560b3</code> · <code>156.0b3</code>
+        </span>
+        <span class="group">
+          <strong class="group-title">channel</strong>
+          <code>beta</code> (or just <code>b3</code>) · <code>rc</code> · <code>esr</code> ·
+          <code>release</code> / <code>stable</code> / <code>final</code> ·
+          devedition: <code>devedition</code> / <code>deved</code> / <code>aurora</code> / <code>dev</code>
+        </span>
+        <span class="group">
+          <strong class="group-title">beta index &amp; respin</strong>
+          beta/rc index: <code>beta 3</code> or <code>b3</code><br>
+          candidates respin (defaults to build1): <code>build2</code> · <code>build 2</code> · <code>respin 2</code>
+        </span>
+        <span class="group">
+          <strong class="group-title">locale</strong>
+          a language name (<code>german</code>, <code>french</code>…) or a code (<code>de</code>, <code>fr</code>, <code>es-ES</code>, <code>pt-BR</code>, <code>en-GB</code>)
+        </span>
+        <span class="group">
+          <strong class="group-title">file type</strong>
+          mac: <code>pkg</code> / <code>dmg</code> · windows: <code>exe</code> / <code>msi</code> / <code>zip</code> ·
+          linux: <code>tar.xz</code> / <code>tar.bz2</code> / <code>deb</code> / bare <code>tar</code> (auto-resolves)<br>
+          leaving it out on linux defaults to tar; elsewhere it triggers a fuller search.
+        </span>
+        <span class="group">
+          <strong class="group-title">platform</strong>
+          <code>mac</code> / <code>macos</code> / <code>osx</code><br>
+          <code>win64</code> / <code>windows</code> / <code>win</code> / <code>pc</code> · <code>win32</code><br>
+          arm64: <code>arm</code> / <code>arm64</code> / <code>aarch64</code> / <code>arch</code> / <code>aarch</code> combined with win or linux, or even just an extension that implies it (e.g. <code>win arm</code>, <code>linux aarch64</code>, or plain <code>154b2 arm exe</code>)<br>
+          <code>linux</code> / <code>ubuntu</code> / <code>debian</code> / <code>fedora</code> · <code>linux32</code> / <code>linux i686</code>
+        </span>
+      </span>
+    </span>
+  </p>
+
   <details class="help">
     <summary>how this works / limitations</summary>
     <div class="inner">
@@ -326,8 +433,8 @@
       <code>/pub/firefox/candidates/&lt;version&gt;-candidates/build&lt;N&gt;/&lt;platform&gt;/&lt;locale&gt;/</code> —
       that tree holds every build, including final releases before and after they go live, so it's used
       for beta / rc / esr / release alike rather than the separate <code>releases/</code> mirror. Developer
-      Edition ("devedition" / "deved" / "aurora" / "dev") is the same beta build under its own root instead:
-      <code>/pub/devedition/candidates/&lt;version&gt;-candidates/...</code>.
+      Edition ("devedition" / "deved" / "aurora" / "dev") is fully supported too — it's the same beta build,
+      just published from its own root instead: <code>/pub/devedition/candidates/&lt;version&gt;-candidates/...</code>.
       <br><br>
       To find the exact filename (it isn't always predictable) the app tries to read that folder's real
       directory listing through a public CORS proxy, since Mozilla's archive doesn't send CORS headers itself.
@@ -335,8 +442,8 @@
       Mozilla's normal naming pattern, clearly marked <em>guess</em> — it's usually right, but worth
       checking against the manual browse link if the download 404s.
       <br><br>
-      Only tested against beta / rc / esr / release channels. Nightly and Developer Edition use a different
-      archive layout and aren't handled yet.
+      Tested against beta / rc / esr / release / devedition channels. Nightly uses a different archive
+      layout and isn't handled yet.
     </div>
   </details>
 
