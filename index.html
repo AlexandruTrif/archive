@@ -302,7 +302,7 @@
       try:
       <button data-ex="Firefox 157 beta 3 de pkg">157 beta 3 de pkg</button> ·
       <button data-ex="153 esr de pkg">153 esr de pkg</button> ·
-      <button data-ex="153.2 esr es zip">153.2 esr es zip</button> ·
+      <button data-ex="153.2 esr es zip">153.2 esr es win</button> ·
       <button data-ex="115.25esr dmg de">115.25esr dmg de</button> ·
       <button data-ex="128.6esr exe en-gb">128.6esr exe en-gb</button> ·
       <button data-ex="140.7.1esr deb">140.7.1esr deb </button>
@@ -519,13 +519,18 @@
     // Windows ARM64 — catch any ordering/spacing of an arm token plus a
     // windows token (e.g. "win arm", "windows arm64", "arm64 pc"), since
     // the exact-phrase entries in PLATFORMS below can't cover every
-    // combination and would otherwise let a bare "win" win first.
+    // combination and would otherwise let a bare "win" win first. An
+    // extension alone can also imply the family (e.g. "exe" means
+    // Windows) even with no literal "win" word in the query at all.
     const ARM_TOKEN = /\b(arm64|aarch64|aarch|arch|arm)\b/;
-    if(ARM_TOKEN.test(q) && /\b(win|windows|pc)\b/.test(q)){
+    const extFamily = found.ext && EXT_HINTS[found.ext];
+    const impliesWindows = /\b(win|windows|pc)\b/.test(q) || (extFamily && extFamily.startsWith("win"));
+    const impliesLinux = /\b(linux|ubuntu|debian|fedora)\b/.test(q) || (extFamily && extFamily.startsWith("linux"));
+    if(ARM_TOKEN.test(q) && impliesWindows){
       found.platform = "win64-aarch64";
     }
     // Same idea for Linux ARM64 (e.g. "linux arm", "arm64 ubuntu").
-    if(!found.platform && ARM_TOKEN.test(q) && /\b(linux|ubuntu|debian|fedora)\b/.test(q)){
+    if(!found.platform && ARM_TOKEN.test(q) && impliesLinux){
       found.platform = "linux-aarch64";
     }
 
@@ -583,7 +588,8 @@
       .replace(/\bb(?:eta)?\s*\d+\b/g," ")
       .replace(/\brc\s*\d+\b/g," ");
     if(!found.version){
-      m = qStripped.match(/\b(\d{2,3}(?:\.\d+){0,2})\b/);
+      m = qStripped.match(/\b(\d{3}(?:\.\d+){0,2})\b/);
+      if(!m) m = qStripped.match(/\b(\d{2}(?:\.\d+){0,2})\b/);
       if(m) found.version = m[1];
     }
 
