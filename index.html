@@ -119,6 +119,66 @@
   @media (max-width:520px){
     .howto-popover{ width:min(88vw, 340px); left:auto; right:0; }
   }
+  .toolbar{
+    display:flex;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .btn-toolbar{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--paper);
+    background:transparent;
+    border:1px solid rgba(244,239,225,0.3);
+    border-radius:3px;
+    padding:9px 16px;
+    cursor:pointer;
+    text-decoration:none;
+    display:inline-block;
+    line-height:1.2;
+  }
+  .btn-toolbar:hover{
+    border-color:var(--brass-bright);
+    color:var(--brass-bright);
+  }
+  .channel-prefs-wrap{
+    position:relative;
+  }
+  .channel-prefs-panel{
+    position:absolute;
+    top:100%;
+    right:0;
+    margin-top:8px;
+    min-width:220px;
+    background:var(--paper);
+    border:1px solid rgba(28,43,42,0.22);
+    border-radius:4px;
+    box-shadow:0 20px 48px -14px rgba(0,0,0,0.6);
+    padding:6px;
+    z-index:40;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .channel-prefs-panel[hidden]{ display:none; }
+  .channel-prefs-option{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink);
+    background:transparent;
+    border:none;
+    border-radius:3px;
+    padding:9px 12px;
+    text-align:left;
+    cursor:pointer;
+  }
+  .channel-prefs-option:hover{
+    background:rgba(28,43,42,0.08);
+    color:var(--red-stamp);
+  }
+  @media (max-width:520px){
+    .channel-prefs-panel{ right:0; left:auto; min-width:200px; }
+  }
   .card{
     background:var(--paper);
     color:var(--ink);
@@ -199,6 +259,7 @@
     flex-wrap:wrap;
     gap:10px;
   }
+  .parsed[hidden]{ display:none; }
   .chip{
     display:flex;
     align-items:center;
@@ -357,6 +418,21 @@
     <h1>Firefox Archive Finder</h1>
     <p>Describe a build in plain words — version, channel, language, platform — and this pulls the real file straight out of Mozilla's release archive.</p>
   </header>
+
+  <div class="toolbar">
+    <a class="btn-toolbar" href="https://drive.google.com/file/d/1RDtjjylKWargiUtt50MCl4onZIzMQ523/view?usp=sharing" target="_blank" rel="noopener">Frameworks</a>
+    <div class="channel-prefs-wrap">
+      <button class="btn-toolbar" type="button" id="channelPrefsBtn">Channel Prefs ▾</button>
+      <div class="channel-prefs-panel" id="channelPrefsPanel" hidden>
+        <button type="button" class="channel-prefs-option" data-channel="beta-localtest">beta-localtest</button>
+        <button type="button" class="channel-prefs-option" data-channel="beta-cdntest">beta-cdntest</button>
+        <button type="button" class="channel-prefs-option" data-channel="release-localtest">release-localtest</button>
+        <button type="button" class="channel-prefs-option" data-channel="release-cdntest">release-cdntest</button>
+        <button type="button" class="channel-prefs-option" data-channel="esr-localtest">esr-localtest</button>
+        <button type="button" class="channel-prefs-option" data-channel="esr-cdntest">esr-cdntest</button>
+      </div>
+    </div>
+  </div>
 
   <div class="card searchcard">
     <span class="field-label">describe the build</span>
@@ -1004,6 +1080,23 @@
     }catch(e){ /* the visible download button still works even if this fails */ }
   }
 
+  // Generates a small text file in-memory and downloads it — used by the
+  // Channel Prefs menu to hand back a ready-made channel-prefs.js.
+  function downloadTextFile(filename, content){
+    try{
+      const blob = new Blob([content], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }catch(e){ /* nothing more we can do if the browser blocks this */ }
+  }
+
   async function resolveAndRender(chips, opts){
     opts = opts || {};
     const gen = ++currentGen;
@@ -1135,6 +1228,27 @@
     await new Promise(r => setTimeout(r, 30));
     resolveAndRender(chips, { autoDownload: true });
   }
+
+  // Channel Prefs menu: toggle open/closed, download on pick, close on
+  // an outside click (or after a pick).
+  const channelPrefsBtn = document.getElementById("channelPrefsBtn");
+  const channelPrefsPanel = document.getElementById("channelPrefsPanel");
+  channelPrefsBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    channelPrefsPanel.hidden = !channelPrefsPanel.hidden;
+  });
+  document.querySelectorAll(".channel-prefs-option").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const channel = btn.getAttribute("data-channel");
+      downloadTextFile("channel-prefs.js", `pref("app.update.channel", "${channel}");\n`);
+      channelPrefsPanel.hidden = true;
+    });
+  });
+  document.addEventListener("click", (e) => {
+    if(!channelPrefsPanel.hidden && !channelPrefsPanel.contains(e.target) && e.target !== channelPrefsBtn){
+      channelPrefsPanel.hidden = true;
+    }
+  });
 
   document.getElementById("go").addEventListener("click", run);
   document.getElementById("query").addEventListener("keydown", e => { if(e.key === "Enter") run(); });
